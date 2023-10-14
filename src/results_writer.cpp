@@ -18,7 +18,11 @@ void ResultsWriter::Executor()
         std::string hash;
         // check if current block is here
         {
-            std::lock_guard<std::mutex> guard(m_mutex);
+            std::unique_lock guard(m_mutex);
+            m_cv.wait(guard, [&] {
+                return m_readyFlag;
+            });
+
             auto search = m_results.find(m_currentBlockNummer);
             if (search != m_results.end()) 
             {
@@ -26,16 +30,14 @@ void ResultsWriter::Executor()
                 hash = search->second;
                 m_results.erase(search);
             }
+            guard.unlock();
         }
 
-        if (hash.empty())
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        else
+        if (!hash.empty())
         {
             hash += "\n";
             outputFile << hash;
+            m_cv.notify_one();
         }
     }
 
@@ -44,6 +46,10 @@ void ResultsWriter::Executor()
 
 void ResultsWriter::AddResult(size_t blockNumber, const std::string &hash)
 {
-    std::lock_guard<std::mutex> guard(m_mutex);
-    m_results.insert({blockNumber, hash});
+    {
+        std::lock_guard guard(m_mutex);
+        m_results.insert({blockNumber, hash});
+        m_readyFlag = true;
+    }
+    m_cv.notify_one();
 }

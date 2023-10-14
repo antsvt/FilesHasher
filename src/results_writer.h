@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
 #include <filesystem> 
 #include <unordered_map>
 
@@ -31,6 +32,9 @@ private:
 
 private:
     std::mutex m_mutex;
+    std::condition_variable m_cv;
+    bool m_readyFlag = false;
+
     std::unordered_map<size_t, std::string> m_results;
 
     std::filesystem::path m_outputPath;
